@@ -1,0 +1,37 @@
+name: DAST Workflow
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Start OWASP ZAP
+        uses: zaproxy/action-full-scan@v0.4.0
+        with:
+          token: ${{ secrets.Github_TOKEN }}
+          target: 'http://your-web-application-url'
+          rules_file_name: '.zap/rules.tsv'
+          docker_name: 'owasp/zap2docker-stable'
+          cmd_options: '-daemon -config api.disablekey=true'
+
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v2
+        with:
+          name: zap_report
+          path: 'zap/wrk/output/'
+
+      - name: ZAP Alerts Report
+        if: failure()
+        run: |
+          echo "ZAP Scan failed"
+          echo "Review the alerts at: ${{ steps.zap.outputs.report_url }}"
