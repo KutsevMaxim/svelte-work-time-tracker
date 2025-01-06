@@ -1,37 +1,50 @@
-name: DAST Workflow
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+name: Build code, run unit test, run SAST, SCA, DAST security scans for NodeJs App
+on: push
 
 jobs:
-  zap_scan:
+  Build:
     runs-on: ubuntu-latest
+    name: Unit Test and SAST
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Start OWASP ZAP
-        uses: zaproxy/action-full-scan@v0.4.0
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: npm
+    - name: Install dependencies
+      run: npm install
+    - name: Test and coverage
+      run: npm run test
+    - name: SonarCloud Scan
+      uses: sonarsource/sonarcloud-github-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.organization=[YOUR_SONAR_ORGANISATION]
+          -Dsonar.projectKey=[YOUR_SONAR_PROJECT]
+  SCA:
+    runs-on: ubuntu-latest
+    needs: Build
+    name: SCA - SNYK
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  DAST:
+    runs-on: ubuntu-latest
+    needs: SCA
+    name: DAST - ZAP
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.Github_TOKEN }}
-          target: 'http://your-web-application-url'
-          rules_file_name: '.zap/rules.tsv'
-          docker_name: 'owasp/zap2docker-stable'
-          cmd_options: '-daemon -config api.disablekey=true'
-
-      - name: Upload ZAP Report
-        uses: actions/upload-artifact@v2
+          ref: main
+      - name: ZAP Scan
+        uses: zaproxy/action-baseline@v0.11.0
         with:
-          name: zap_report
-          path: 'zap/wrk/output/'
-
-      - name: ZAP Alerts Report
-        if: failure()
-        run: |
-          echo "ZAP Scan failed"
-          echo "Review the alerts at: ${{ steps.zap.outputs.report_url }}"
+          target: 'https://kutsevmaxim-svelte-work-time-tracker-71a2.twc1.net/'
