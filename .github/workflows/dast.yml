@@ -1,0 +1,41 @@
+import requests
+from bs4 import BeautifulSoup
+
+def check_for_sql_injection(url):
+    payloads = ["' OR '1'='1'", "' OR 1=1--"]
+    
+    for payload in payloads:
+        response = requests.get(f"{url}?id={payload}")
+        
+        if "You have an error in your SQL syntax" in response.text or "syntax error" in response.text:
+            return f"SQL Injection vulnerability found at {url}"
+    
+    return None
+
+def check_for_xss(url):
+    payloads = ['<script>alert("XSS")</script>', '<img src=x onerror="alert(\'XSS\')">']
+    
+    for payload in payloads:
+        response = requests.post(url, data={"input": payload})
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        if payload in str(soup):
+            return f"XSS vulnerability found at {url}"
+    
+    return None
+
+if __name__ == "__main__":
+    url = input("Enter the URL to test: ")
+    
+    sql_result = check_for_sql_injection(url)
+    xss_result = check_for_xss(url)
+    
+    if sql_result:
+        print(sql_result)
+    else:
+        print("No SQL Injection vulnerabilities found.")
+    
+    if xss_result:
+        print(xss_result)
+    else:
+        print("No XSS vulnerabilities found.")
