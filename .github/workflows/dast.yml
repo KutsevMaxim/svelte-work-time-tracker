@@ -1,8 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-
-def check_for_sql_injection(url):
-    payloads = ["' OR '1'='1'", "' OR 1=1--"]
     
     for payload in payloads:
         response = requests.get(f"{url}?id={payload}")
